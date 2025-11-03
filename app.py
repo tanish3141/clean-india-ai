@@ -19,6 +19,20 @@ st.sidebar.header("📈 Dashboard Summary")
 st.sidebar.metric("Images Analyzed", st.session_state.count)
 st.sidebar.metric("Model", "MobileNetV2")
 st.sidebar.metric("Estimated Accuracy", "92%")
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Demo", "Future Scope"])
+
+if page == "Demo":
+    # existing app code
+elif page == "Future Scope":
+    st.header("🚀 Future Scalability of Swachh AI")
+    st.markdown("""
+    - **CCTV/Drone Integration:** Real-time monitoring of public places.
+    - **Smart Routing:** AI to predict efficient waste collection paths.
+    - **Citizen Portal:** App interface for reporting unclean areas.
+    - **Data Insights:** Dashboards for authorities.
+    """)
+
 
 def load_model():
     model = tf.keras.models.load_model("model/clean_model_tf_v2.keras")
@@ -102,5 +116,6 @@ if st.button("Analyze Image"):
         st.success("✅ Report saved successfully!")
     
 st.markdown("---")
+
 
 
