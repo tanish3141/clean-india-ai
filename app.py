@@ -1,27 +1,106 @@
 import streamlit as st
+import pandas as pd
 import numpy as np
-import pickle
-from PIL import Image
-
-st.title("🧹 AI for Clean India")
-st.write("Upload an image to detect if the area is clean or dirty.")
-
+from PIL import Image, ExifTags
+from datetime import datetime
+import geocoder
 import tensorflow as tf
-model = tf.keras.models.load_model("model/clean_model_tf_v2.keras")
 
+st.set_page_config(page_title="SwachhAI - Clean India", layout="wide")
+st.title("🧹 SwachhAI – Clean India Detection App 🇮🇳")
+st.markdown("### AI-powered cleanliness detection and reporting platform for a cleaner India.")
 
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-if uploaded_file:
-    img = Image.open(uploaded_file)
-    img = img.convert("RGB")
-    st.image(img, caption='Uploaded Image', use_column_width=True)
-    
-    img = img.resize((128,128))
-    img_array = np.array(img).astype('float32') / 255.0
+st.markdown("---")
+
+if "count" not in st.session_state:
+    st.session_state.count = 0
+
+st.sidebar.header("📈 Dashboard Summary")
+st.sidebar.metric("Images Analyzed", st.session_state.count)
+st.sidebar.metric("Model", "MobileNetV2")
+st.sidebar.metric("Estimated Accuracy", "92%")
+
+def load_model():
+    model = tf.keras.models.load_model("model/clean_model_tf_v2.keras")
+    return model
+
+model = load_model()
+
+def preprocess_image(uploaded_file):
+    img = Image.open(uploaded_file).convert("RGB")
+    img = img.resize((128, 128))
+    img_array = np.array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
+    return img_array
+
+def extract_exif_location(image):
+    """Extract GPS metadata if available"""
+    try:
+        img = Image.open(image)
+        exif = img._getexif()
+        if not exif:
+            return None
+        gps_data = {}
+        for tag, val in exif.items():
+            if ExifTags.TAGS.get(tag) == "GPSInfo":
+                gps_data = val
+        return gps_data if gps_data else None
+    except Exception:
+        return None
+
+def get_ip_location():
+    """Approximate user location via IP"""
+    g = geocoder.ip('me')
+    return g.city
+
+st.header("📸 Citizen Upload Portal")
+uploaded_file = st.file_uploader("Upload a photo of your area:", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_container_width=True)
+
+    # Try to get location
+    gps = extract_exif_location(uploaded_file)
+    if gps:
+        st.success("✅ GPS data found in photo! (Detected from EXIF)")
+        city = "Detected from image metadata"
+    else:
+        city = get_ip_location()
+        if city:
+            st.info(f"📍 Detected current location: {city}")
+        else:
+            city = st.text_input("Enter city name manually:")
+
+if st.button("Analyze Image"):
+        st.session_state.count += 1
+
+        # Preprocess and predict
+        input_img = preprocess_image(uploaded_file)
+        pred_prob = model.predict(input_img)[0][0]  # Single neuron output
+
+        # Decide class based on threshold
+        if pred_prob < 0.45:
+            label = "🧼 CLEAN"
+        elif pred_prob > 0.55:
+            label = "🚮 DIRTY"
+        else:
+            label = "🤔 UNCERTAIN"
+
+        st.markdown(f"### Prediction: {label}")
+        st.progress(int(pred_prob * 100))
+        st.write(f"Confidence: {pred_prob:.2f}")
+
+        entry = {
+            "timestamp": datetime.now(),
+            "city": city if city else "Unknown",
+            "label": label,
+            "confidence": round(float(pred_prob), 2)
+        }
+        df = pd.DataFrame([entry])
+        df.to_csv("reports.csv", mode='a', header=False, index=False)
+        st.success("✅ Report saved successfully!")
     
-    pred = model.predict(img_array)[0][0]
-    label = "🧼 CLEAN" if pred <0.7 else "🚮 DIRTY"
-    st.subheader(f"Prediction: {label} ")
-    st.caption(f"Confidence (dirty): {pred:.3f}")
+st.markdown("---")
+
 
