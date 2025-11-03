@@ -79,12 +79,9 @@ if page == "Demo":
         if gps:
             st.success("✅ GPS data found in photo! (Detected from EXIF)")
             city = "Detected from image metadata"
+        
         else:
-            city = get_ip_location()
-            if city:
-                st.info(f"📍 Detected current location: {city}")
-            else:
-                city = st.text_input("Enter city name manually:")
+            city = st.text_input("Enter city name manually:")
 
         if st.button("Analyze Image"):
             st.session_state.count += 1
@@ -141,3 +138,4 @@ elif page == "Future Scope":
     """)
 
 st.markdown("---")
+
